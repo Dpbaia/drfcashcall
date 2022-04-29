@@ -1,8 +1,9 @@
 from django.shortcuts import render
 from django.contrib.auth.models import User, Group
+from cashcalls.models.bill.models import Bill
 from rest_framework import viewsets
 from rest_framework import permissions
-from cashcalls.serializers import UserSerializer, GroupSerializer
+from cashcalls.serializers import UserSerializer, GroupSerializer, BillSerializer
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -19,3 +20,11 @@ class GroupViewSet(viewsets.ModelViewSet):
     """
     queryset = Group.objects.all()
     serializer_class = GroupSerializer
+
+class BillViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows bills to be viewed or edited.
+    """
+    queryset = Bill.objects.all()
+    serializer_class = BillSerializer
+    # Maybe find way of blocking out fields when they not needed?
