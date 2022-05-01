@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 from fastapi import UploadFile
 from datetime import date, timedelta
 from django import utils
+from calendar import isleap
 
 
 # Create your models here.
@@ -43,7 +44,7 @@ class Bill(models.Model):
         choices = CASH_CALL_STATUS_CHOICES,
         max_length = 10,
     )
-    final_fee = models.FloatField(default = 0, editable = False) # Create a method that calculates this following the below rules
+    final_fee = models.FloatField(default = 0, editable = False)
     investor = models.CharField(max_length = 80, default="Investor 1")
 
     def clean(self):
@@ -65,19 +66,15 @@ class Bill(models.Model):
         if self.type_of_fee == 'up':
             self.final_fee = self.fee_percentage * self.amount_invested * 5
         elif self.type_of_fee == 'yr':
-            if self.date < date(2019,4,30) and ((self.date - date(2019,4,30)).days/365 <= 1) :
-                # TODO entering this even if it's older than 1 year, why? Check second part of the operation?
-                # date of the investment bought / 365 x fee percentage x amount invested
-                self.final_fee = self.date.day/365 * self.fee_percentage * self.amount_invested # TODO transform the date into number of days only and then substitute 
-                raise
+            if self.date < date(2019,4,30) and ((date(2019,4,30) - self.date).days/365 <= 1) :
+                self.final_fee = self.date.timetuple().tm_yday/365 * self.fee_percentage * self.amount_invested
             elif self.date < date(2019,4,30):
-                # fee percentage x amount invested
                 self.final_fee = self.fee_percentage * self.amount_invested
             else:
                 years_since_investment = (utils.timezone.now().date() - self.date).days/365
                 if years_since_investment <= 1:
-                    self.final_fee = (self.date.day / 365) * self.fee_percentage * self.amount_invested # TODO Check how many days were in that year! 
-                    # TODO transform the date into number of days only and then substitute 
+                    days_of_year = 366 if isleap(self.date.year) else 365
+                    self.final_fee = (self.date.timetuple().tm_yday / days_of_year) * self.fee_percentage * self.amount_invested
                 elif years_since_investment <= 2:
                     self.final_fee = self.fee_percentage * self.amount_invested
                 elif years_since_investment <= 3:
@@ -113,3 +110,4 @@ class Bill(models.Model):
 
 
     
+# Bill.objects.create(type_of_fee = "yr", amount_invested= 2.0, fee_percentage= 2.0, date= "2016-02-01", cash_call_status= "vl", investor= "aaaaa")
