@@ -1,25 +1,8 @@
-from django.shortcuts import render
-from django.contrib.auth.models import User, Group
 from cashcalls.models.bill.models import Bill
 from rest_framework import viewsets
-from rest_framework import permissions
-from cashcalls.serializers import UserSerializer, GroupSerializer, BillSerializer
+from cashcalls.serializers import BillSerializer
+from django_filters.rest_framework import DjangoFilterBackend
 
-
-class UserViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint that allows users to be viewed or edited.
-    """
-    queryset = User.objects.all().order_by('-date_joined')
-    serializer_class = UserSerializer
-
-
-class GroupViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint that allows groups to be viewed or edited.
-    """
-    queryset = Group.objects.all()
-    serializer_class = GroupSerializer
 
 class BillViewSet(viewsets.ModelViewSet):
     """
@@ -27,4 +10,15 @@ class BillViewSet(viewsets.ModelViewSet):
     """
     queryset = Bill.objects.all()
     serializer_class = BillSerializer
-    # Maybe find way of blocking out fields when they not needed?
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['investor']
+    def get_queryset(self):
+        """
+        Optionally restricts the returned bills to a given investor,
+        by filtering against a `investor` query parameter in the URL.
+        """
+        queryset = Bill.objects.all()
+        investor = self.request.query_params.get('investor')
+        if investor is not None:
+            queryset = queryset.filter(investor=investor)
+        return queryset

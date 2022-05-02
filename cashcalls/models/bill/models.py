@@ -1,17 +1,9 @@
 from django.db import models
-from django.core.exceptions import ValidationError
-from fastapi import UploadFile
-from datetime import date, timedelta
+from datetime import date
 from django import utils
 from calendar import isleap
+from cashcalls.custom_handlers import CustomBadRequest
 
-
-# Create your models here.
-
-# Link all of this to the serializers
-# Then create a new view
-# Then finally send it to routes so we can see it on the API
-# TODO write tests
 class Bill(models.Model):
     UPFRONT = 'up'
     YEARLY = 'yr'
@@ -47,15 +39,6 @@ class Bill(models.Model):
     final_fee = models.FloatField(default = 0, editable = False)
     investor = models.CharField(max_length = 80, default="Investor 1")
 
-    def clean(self):
-        super().clean()
-        type_of_fee = self.type_of_fee
-        fee_percentage = self.fee_percentage
-        if type_of_fee == 'up' or type_of_fee == 'yr':
-            if not (fee_percentage and self.amount_invested):
-                raise ValidationError(
-                    "Must enter amount invested and fee percentage for this type of fee"
-                ) # Transform this into a status code for the restAPI.
                 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -71,43 +54,32 @@ class Bill(models.Model):
             elif self.date < date(2019,4,30):
                 self.final_fee = self.fee_percentage * self.amount_invested
             else:
-                years_since_investment = (utils.timezone.now().date() - self.date).days/365
-                if years_since_investment <= 1:
-                    days_of_year = 366 if isleap(self.date.year) else 365
-                    self.final_fee = (self.date.timetuple().tm_yday / days_of_year) * self.fee_percentage * self.amount_invested
-                elif years_since_investment <= 2:
-                    self.final_fee = self.fee_percentage * self.amount_invested
-                elif years_since_investment <= 3:
-                    self.final_fee = (self.fee_percentage - 0.20) * self.amount_invested
-                elif years_since_investment <= 4:
-                    self.final_fee = (self.fee_percentage - 0.5) * self.amount_invested
-                else:
-                    self.final_fee = (self.fee_percentage - 1) * self.amount_invested
+                self.__calculate_based_on_years_since_investment()
         else:
-            self.final_fee = 42 #TODO code the membership price, 3000 euro per year if investments that year are lower than 50000 euros
-    # Kind of bill:
-		# !Upfront fees: fee % x amount * 5 years
-		# !Yearly
-			#if before 04/2019 && if how_many_years <= 1
-				# date / 365 * fee * amount
-			# elsif before 04/2019 
-				# amount * fee
-			# else
-				# case how_many_years 
-					# 1
-						#Date / amount of days in that year ( ano bissexto vai tomar no cu como caracas eu vou checar se é bissexto fdp) * fee * amount
-                    # 2
-                        #Fee * amount
-                    # Third year:
-                        #(fee percentage - 0.20 %) x amount invested
-                    # Fourth year:
-                        #(fee percentage - 0.50 %) x amount invested
-                    # Following years:
-                        #(fee percentage - 1 %) x amount invested
-        # Create a way of calculating !membership
-            # If all amount invested > 50000, final fee = 0 
-            # Else, final fee = 3000
+            all_bills_by_current_investor = Bill.objects.filter(investor = self.investor)
+            amount_invested = 0
+            for bill in all_bills_by_current_investor:
+                amount_invested += bill.amount_invested
+            self.final_fee = 0 if (amount_invested >= 50000) else 3000
 
+    def clean(self):
+        super().clean()
+        type_of_fee = self.type_of_fee
+        fee_percentage = self.fee_percentage
+        if type_of_fee == 'up' or type_of_fee == 'yr':
+            if not (fee_percentage and self.amount_invested):
+                raise CustomBadRequest(detail="This type of fee requires fee percentage and amount invested.")
 
-    
-# Bill.objects.create(type_of_fee = "yr", amount_invested= 2.0, fee_percentage= 2.0, date= "2016-02-01", cash_call_status= "vl", investor= "aaaaa")
+    def __calculate_based_on_years_since_investment(self):
+        years_since_investment = (utils.timezone.now().date() - self.date).days/365
+        if years_since_investment <= 1:
+            days_of_year = 366 if isleap(self.date.year) else 365
+            self.final_fee = (self.date.timetuple().tm_yday / days_of_year) * self.fee_percentage * self.amount_invested
+        elif years_since_investment <= 2:
+            self.final_fee = self.fee_percentage * self.amount_invested
+        elif years_since_investment <= 3:
+            self.final_fee = (self.fee_percentage - 0.20) * self.amount_invested
+        elif years_since_investment <= 4:
+            self.final_fee = (self.fee_percentage - 0.5) * self.amount_invested
+        else:
+            self.final_fee = (self.fee_percentage - 1) * self.amount_invested
