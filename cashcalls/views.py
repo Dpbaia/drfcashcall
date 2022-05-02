@@ -1,7 +1,7 @@
-from cashcalls.models.bill.models import Bill
 from rest_framework import viewsets
-from cashcalls.serializers import BillSerializer
 from django_filters.rest_framework import DjangoFilterBackend
+from cashcalls.models.bill.models import Bill
+from cashcalls.serializers import BillSerializer
 
 
 class BillViewSet(viewsets.ModelViewSet):
@@ -12,6 +12,7 @@ class BillViewSet(viewsets.ModelViewSet):
     serializer_class = BillSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['investor']
+
     def get_queryset(self):
         """
         Optionally restricts the returned bills to a given investor,
